@@ -1,63 +1,129 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import {
-  Search, Bell, Plus, Command, ChevronDown, Menu, X,
-  Settings, type LucideIcon, ShieldCheck, AlertTriangle,
+  Search, Bell, Plus, Command, ChevronDown, ChevronRight, Menu, X,
+  Settings, ShieldCheck, AlertTriangle,
 } from 'lucide-react';
-import { navigation, allRoutes } from '../navigation';
+import { navigation, allRoutes, type NavSection, type NavSubGroup, type NavItem } from '../navigation';
 
-/* ---------------- Sidebar ---------------- */
-function NavGroup({
-  group,
+/* ---------------- Nav Item (leaf) ---------------- */
+function NavLeaf({ item, activePath, onNavigate }: { item: NavItem; activePath: string; onNavigate: (p: string) => void }) {
+  const Icon = item.icon;
+  const active = activePath === item.path;
+  return (
+    <button
+      onClick={() => onNavigate(item.path)}
+      className={`nav-link w-full pl-3 ${active ? 'nav-link-active' : ''}`}
+    >
+      <Icon className="w-3.5 h-3.5 shrink-0 opacity-60" />
+      <span className="truncate text-body-sm text-body-sm">{item.label}</span>
+    </button>
+  );
+}
+
+/* ---------------- Nav Sub-group (middle level) ---------------- */
+function NavSubGroupView({
+  subgroup,
   activePath,
   onNavigate,
   expanded,
   onToggle,
 }: {
-  group: { id: string; label: string; icon: LucideIcon; path: string; children?: any[] };
+  subgroup: NavSubGroup;
   activePath: string;
-  onNavigate: (path: string) => void;
+  onNavigate: (p: string) => void;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const Icon = group.icon;
-  const children = group.children ?? [];
-  const hasChildren = children.length > 0;
-  const isActive = activePath === group.path || activePath.startsWith(group.path + '/');
-  const isChildActive = hasChildren && children.some((c: any) => activePath === c.path || activePath.startsWith(c.path + '/'));
+  const Icon = subgroup.icon;
+  const isItemActive = subgroup.items.some((i) => activePath === i.path || activePath.startsWith(i.path + '/'));
 
   return (
-    <div className="mb-0.5">
+    <div>
       <button
-        onClick={() => (hasChildren ? onToggle() : onNavigate(group.path))}
-        className={`nav-link w-full justify-between ${isActive || isChildActive ? 'nav-link-active' : ''}`}
+        onClick={onToggle}
+        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-body-sm text-body-sm transition-colors ${
+          isItemActive ? 'text-on-surface font-semibold' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+        }`}
       >
-        <span className="flex items-center gap-3 min-w-0">
-          <Icon className="w-[18px] h-[18px] shrink-0" />
-          <span className="truncate">{group.label}</span>
-        </span>
-        {hasChildren && (
-          <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        )}
+        <Icon className="w-3.5 h-3.5 shrink-0 opacity-60" />
+        <span className="flex-1 text-left truncate">{subgroup.label}</span>
+        <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
       </button>
-      {hasChildren && expanded && (
-        <div className="mt-0.5 mb-1 ml-5 pl-3 border-l border-outline-variant space-y-0.5 animate-fade-in">
-          {children.map((c: any) => {
-            const CIcon = c.icon;
-            const childActive = activePath === c.path;
-            return (
-              <button
-                key={c.id}
-                onClick={() => onNavigate(c.path)}
-                className={`nav-link w-full ${childActive ? 'nav-link-active' : ''}`}
-              >
-                <CIcon className="w-4 h-4 shrink-0 opacity-70" />
-                <span className="truncate">{c.label}</span>
-              </button>
-            );
-          })}
+      {expanded && (
+        <div className="ml-4 pl-2 border-l border-outline-variant/60 space-y-0.5 mt-0.5 mb-1 animate-fade-in">
+          {subgroup.items.map((item) => (
+            <NavLeaf key={item.id} item={item} activePath={activePath} onNavigate={onNavigate} />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+/* ---------------- Nav Section (top level) ---------------- */
+function NavSectionView({
+  section,
+  activePath,
+  onNavigate,
+  expanded,
+  onToggle,
+}: {
+  section: NavSection;
+  activePath: string;
+  onNavigate: (p: string) => void;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const Icon = section.icon;
+  const isSectionActive = section.subgroups.some((sg) =>
+    sg.items.some((i) => activePath === i.path || activePath.startsWith(i.path + '/'))
+  );
+
+  return (
+    <div className="mb-1">
+      <button
+        onClick={onToggle}
+        className={`nav-link w-full justify-between ${isSectionActive ? 'nav-link-active' : ''}`}
+      >
+        <span className="flex items-center gap-3 min-w-0">
+          <Icon className="w-[18px] h-[18px] shrink-0" />
+          <span className="truncate">{section.label}</span>
+        </span>
+        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="mt-1 mb-2 ml-3 pl-2 border-l border-outline-variant space-y-1.5 animate-fade-in">
+          {section.subgroups.map((sg) => (
+            <SubGroupWrapper key={sg.id} subgroup={sg} activePath={activePath} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Sub-group wrapper with its own expand state */
+function SubGroupWrapper({
+  subgroup,
+  activePath,
+  onNavigate,
+}: {
+  subgroup: NavSubGroup;
+  activePath: string;
+  onNavigate: (p: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(() =>
+    subgroup.items.some((i) => activePath === i.path || activePath.startsWith(i.path + '/'))
+  );
+
+  return (
+    <NavSubGroupView
+      subgroup={subgroup}
+      activePath={activePath}
+      onNavigate={onNavigate}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+    />
   );
 }
 
@@ -74,9 +140,11 @@ export function Sidebar({
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
-    for (const g of navigation) {
-      const childActive = g.children?.some((c) => activePath === c.path || activePath.startsWith(c.path + '/'));
-      init[g.id] = !!childActive;
+    for (const s of navigation) {
+      const sectionActive = s.subgroups.some((sg) =>
+        sg.items.some((i) => activePath === i.path || activePath.startsWith(i.path + '/'))
+      );
+      init[s.id] = sectionActive;
     }
     return init;
   });
@@ -88,44 +156,47 @@ export function Sidebar({
       {open && <div className="fixed inset-0 bg-on-surface/30 z-40 lg:hidden" onClick={onClose} />}
 
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-[260px] bg-surface border-r border-outline-variant flex flex-col transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-[280px] bg-surface border-r border-outline-variant flex flex-col transition-transform duration-300 lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        {/* Brand */}
         <div className="h-[64px] flex items-center gap-2.5 px-5 border-b border-outline-variant shrink-0">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
             <ShieldCheck className="w-5 h-5 text-on-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-title-md text-title-md text-on-surface leading-tight">Concierge</div>
-            <div className="text-label-sm text-label-sm text-on-surface-variant leading-tight">Admin Platform</div>
+            <div className="text-title-md text-on-surface leading-tight">Concierge</div>
+            <div className="text-label-sm text-on-surface-variant leading-tight">Admin Platform</div>
           </div>
           <button onClick={onClose} className="btn-icon lg:hidden">
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide">
-          {navigation.map((g) => (
-            <NavGroup
-              key={g.id}
-              group={g}
+          {navigation.map((s) => (
+            <NavSectionView
+              key={s.id}
+              section={s}
               activePath={activePath}
               onNavigate={onNavigate}
-              expanded={expanded[g.id] ?? false}
-              onToggle={() => toggle(g.id)}
+              expanded={expanded[s.id] ?? false}
+              onToggle={() => toggle(s.id)}
             />
           ))}
         </nav>
 
+        {/* Footer */}
         <div className="px-3 py-3 border-t border-outline-variant shrink-0">
           <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer">
             <div className="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-fixed font-semibold flex items-center justify-center text-xs">
               AD
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-label-md text-label-md text-on-surface truncate">Alex Drake</div>
-              <div className="text-label-sm text-label-sm text-on-surface-variant truncate">Super Admin</div>
+              <div className="text-label-md text-on-surface truncate">Alex Drake</div>
+              <div className="text-label-sm text-on-surface-variant truncate">Super Admin</div>
             </div>
             <Settings className="w-4 h-4 text-on-surface-variant" />
           </div>
@@ -179,7 +250,7 @@ export function TopNav({
           />
           <button
             onClick={onOpenPalette}
-            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-label-sm text-label-sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-label-sm"
           >
             <Command className="w-3 h-3" />K
           </button>
@@ -190,10 +261,10 @@ export function TopNav({
               <button
                 key={r.path}
                 onClick={() => { onNavigate(r.path); setShowResults(false); setSearch(''); }}
-                className="w-full text-left px-3 py-2 hover:bg-surface-container-low flex items-center justify-between text-body-sm text-body-sm"
+                className="w-full text-left px-3 py-2 hover:bg-surface-container-low flex items-center justify-between text-body-sm"
               >
                 <span className="text-on-surface">{r.label}</span>
-                <span className="text-label-sm text-label-sm text-on-surface-variant">{r.path}</span>
+                <span className="text-label-sm text-on-surface-variant">{r.path}</span>
               </button>
             ))}
           </div>
@@ -227,7 +298,7 @@ export function TopNav({
                 <button
                   key={item.label}
                   onClick={() => { onNavigate(item.path); setQuickCreateOpen(false); }}
-                  className="w-full text-left px-3 py-2.5 hover:bg-surface-container-low flex items-center gap-2 text-body-sm text-body-sm text-on-surface"
+                  className="w-full text-left px-3 py-2.5 hover:bg-surface-container-low flex items-center gap-2 text-body-sm text-on-surface"
                 >
                   <Plus className="w-3.5 h-3.5 text-on-surface-variant" />
                   {item.label}
@@ -286,11 +357,11 @@ export function CommandPalette({
             placeholder="Type a command or search…"
             className="flex-1 bg-transparent text-body-md text-on-surface placeholder:text-outline outline-none"
           />
-          <kbd className="px-1.5 py-0.5 rounded bg-surface-container-high text-label-sm text-label-sm text-on-surface-variant">ESC</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-surface-container-high text-label-sm text-on-surface-variant">ESC</kbd>
         </div>
         <div className="max-h-80 overflow-y-auto p-2">
           {results.length === 0 ? (
-            <div className="px-3 py-8 text-center text-body-sm text-body-sm text-on-surface-variant">No results found</div>
+            <div className="px-3 py-8 text-center text-body-sm text-on-surface-variant">No results found</div>
           ) : (
             results.map((r) => (
               <button
@@ -298,8 +369,8 @@ export function CommandPalette({
                 onClick={() => { onNavigate(r.path); onClose(); }}
                 className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-surface-container-low flex items-center justify-between"
               >
-                <span className="text-body-md text-body-md text-on-surface">{r.label}</span>
-                <span className="text-label-sm text-label-sm text-on-surface-variant">{r.path}</span>
+                <span className="text-body-md text-on-surface">{r.label}</span>
+                <span className="text-label-sm text-on-surface-variant">{r.path}</span>
               </button>
             ))
           )}
@@ -316,7 +387,7 @@ export function AlertBanner({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="bg-error-container/40 border-b border-error/20 px-4 py-2.5 flex items-center gap-3 animate-slide-in-right">
       <AlertTriangle className="w-4 h-4 text-error shrink-0" />
-      <p className="text-body-sm text-body-sm text-on-error-container flex-1">
+      <p className="text-body-sm text-on-error-container flex-1">
         Elevated fraud activity detected on 3 vendor accounts. Review recommended.
       </p>
       <button onClick={() => { setShow(false); onDismiss(); }} className="btn-ghost text-error px-2 py-1">
