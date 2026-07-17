@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
   Search, Plus, Download, MoreVertical, Filter, Star,
-  TrendingUp, TrendingDown, Minus, ArrowRight, BarChart3, Activity,
+  TrendingUp, TrendingDown, Minus, ArrowRight, BarChart3, Activity, Database,
 } from 'lucide-react';
 import {
   Card, CardHeader, CardBody, Badge, Button, StatCard, Table, THead, TH, TR, TD,
   SegmentedControl, ProgressBar, Avatar, PageHeader, EmptyState, Toggle,
 } from './ui';
 import { type RouteMeta } from '../routes';
-import { generateRows, getColumns, generateStats, generateChartData, generateSettingsFields, generateListItems, mulberry32 } from '../data/factory';
+import { generateRows, getColumns, generateStats, generateChartData, generateSettingsFields, generateListItems, mulberry32, getDomainMeta } from '../data/factory';
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const range = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -45,6 +45,7 @@ export function TablePage({ route }: { route: RouteMeta; onNavigate?: (p: string
   const pageSize = 10;
 
   const domain = route.domain;
+  const meta = useMemo(() => getDomainMeta(domain), [domain]);
   const columns = useMemo(() => getColumns(domain), [domain]);
   const stats = useMemo(() => generateStats(domain), [domain]);
   const allRows = useMemo(() => generateRows(domain, 25), [domain]);
@@ -88,6 +89,15 @@ export function TablePage({ route }: { route: RouteMeta; onNavigate?: (p: string
           </>
         }
       />
+
+      {/* Data sources — from spec relationships */}
+      <div className="flex items-center gap-2 flex-wrap text-label-sm text-label-sm text-on-surface-variant">
+        <Database className="w-3.5 h-3.5" />
+        <span>Data from:</span>
+        {meta.dataSources.map((src) => (
+          <Badge key={src} tone="info" className="text-label-sm">{src}</Badge>
+        ))}
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -244,6 +254,7 @@ function renderCell(col: { type: string; key: string }, value: any) {
    SETTINGS PAGE — Form fields with toggles, selects, text inputs
    ======================================================================== */
 export function SettingsPage({ route }: { route: RouteMeta }) {
+  const meta = useMemo(() => getDomainMeta(route.domain), [route.domain]);
   const fields = useMemo(() => generateSettingsFields(route.domain), [route.domain]);
   const [values, setValues] = useState<Record<string, any>>(() =>
     Object.fromEntries(fields.map((f) => [f.label, f.value]))
@@ -365,11 +376,14 @@ export function SettingsPage({ route }: { route: RouteMeta }) {
           </Card>
 
           <Card>
-            <CardHeader title="Related" subtitle="Connected modules" />
+            <CardHeader title="Linked Entities" subtitle="Spec relationships" />
             <CardBody className="space-y-2">
-              {['Vendor Rules', 'Approval Workflows', 'Audit Logs', 'Compliance Reports'].map((r) => (
-                <div key={r} className="flex items-center justify-between py-1.5">
-                  <span className="text-body-sm text-body-sm text-on-surface">{r}</span>
+              {meta.links.map((link) => (
+                <div key={link.label} className="flex items-center justify-between py-1.5">
+                  <div>
+                    <div className="text-body-sm text-body-sm text-on-surface">{link.label}</div>
+                    <div className="text-label-sm text-label-sm text-on-surface-variant">{link.relation}</div>
+                  </div>
                   <ArrowRight className="w-3.5 h-3.5 text-on-surface-variant" />
                 </div>
               ))}
@@ -386,6 +400,7 @@ export function SettingsPage({ route }: { route: RouteMeta }) {
    ======================================================================== */
 export function ReportPage({ route }: { route: RouteMeta }) {
   const [range, setRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const meta = useMemo(() => getDomainMeta(route.domain), [route.domain]);
   const chart = useMemo(() => generateChartData(route.domain), [route.domain]);
   const stats = useMemo(() => generateStats(route.domain), [route.domain]);
   const tableData = useMemo(() => generateRows(route.domain, 8), [route.domain]);
@@ -451,20 +466,17 @@ export function ReportPage({ route }: { route: RouteMeta }) {
         </Card>
 
         <Card>
-          <CardHeader title="Breakdown" subtitle="By category" icon={Filter} />
+          <CardHeader title="Breakdown" subtitle="By category — spec-defined" icon={Filter} />
           <CardBody className="space-y-3">
-            {['Vacation Rentals', 'Event Spaces', 'Experiences', 'Services', 'Tickets'].map((cat, i) => {
-              const pct = [42, 24, 18, 10, 6][i];
-              return (
-                <div key={cat}>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-body-sm text-body-sm text-on-surface">{cat}</span>
-                    <span className="text-body-sm text-body-sm text-on-surface-variant tabular-nums">{pct}%</span>
-                  </div>
-                  <ProgressBar value={pct} />
+            {meta.breakdown.map((cat) => (
+              <div key={cat.label}>
+                <div className="flex justify-between mb-1">
+                  <span className="text-body-sm text-body-sm text-on-surface">{cat.label}</span>
+                  <span className="text-body-sm text-body-sm text-on-surface-variant tabular-nums">{cat.pct}%</span>
                 </div>
-              );
-            })}
+                <ProgressBar value={cat.pct} />
+              </div>
+            ))}
           </CardBody>
         </Card>
       </div>
@@ -495,14 +507,9 @@ export function ReportPage({ route }: { route: RouteMeta }) {
         </Card>
 
         <Card>
-          <CardHeader title="Key Insights" subtitle="Automated analysis" icon={Activity} />
+          <CardHeader title="Key Insights" subtitle="From spec data sources" icon={Activity} />
           <CardBody className="space-y-3">
-            {[
-              { label: 'Peak performance on Saturday', value: '+28% vs average', dir: 'up' },
-              { label: 'Dip detected on Wednesday', value: '-12% vs last week', dir: 'down' },
-              { label: 'Growth trend stable', value: '7-week upward trend', dir: 'up' },
-              { label: 'Anomaly: Sunday spike', value: 'Investigate root cause', dir: 'flat' },
-            ].map((insight) => (
+            {meta.insights.map((insight) => (
               <div key={insight.label} className="flex items-center gap-3 py-1">
                 {insight.dir === 'up' ? <TrendingUp className="w-4 h-4 text-success shrink-0" /> : insight.dir === 'down' ? <TrendingDown className="w-4 h-4 text-error shrink-0" /> : <Minus className="w-4 h-4 text-on-surface-variant shrink-0" />}
                 <div className="flex-1">
@@ -653,6 +660,7 @@ export function ListEditorPage({ route }: { route: RouteMeta }) {
    DETAIL PAGE — Tabbed detail view
    ======================================================================== */
 export function DetailPage({ route }: { route: RouteMeta }) {
+  const meta = useMemo(() => getDomainMeta(route.domain), [route.domain]);
   const tabs = route.tabs ?? ['Overview', 'Details', 'History', 'Settings'];
   const [activeTab, setActiveTab] = useState(0);
   const columns = useMemo(() => getColumns(route.domain), [route.domain]);
@@ -738,11 +746,14 @@ export function DetailPage({ route }: { route: RouteMeta }) {
           </Card>
 
           <Card>
-            <CardHeader title="Related Records" />
+            <CardHeader title="Linked Entities" subtitle="From spec relationships" />
             <CardBody className="space-y-2">
-              {rows.slice(0, 4).map((row, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-outline-variant/40 last:border-0">
-                  <span className="text-body-sm text-body-sm text-on-surface truncate">{row.name ?? row.title ?? row.id ?? `Record ${i+1}`}</span>
+              {meta.links.map((link) => (
+                <div key={link.label} className="flex items-center justify-between py-2 border-b border-outline-variant/40 last:border-0">
+                  <div>
+                    <div className="text-body-sm text-body-sm text-on-surface">{link.label}</div>
+                    <div className="text-label-sm text-label-sm text-on-surface-variant">{link.relation}</div>
+                  </div>
                   <ArrowRight className="w-3.5 h-3.5 text-on-surface-variant" />
                 </div>
               ))}

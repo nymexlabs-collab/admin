@@ -650,6 +650,218 @@ export function generateStats(domain: string) {
   return statsMap[domain] ?? statsMap.org;
 }
 
+/* Domain metadata — data sources, links, breakdowns, and settings per the spec tree */
+export type DomainMeta = {
+  dataSources: string[];
+  links: { label: string; relation: string }[];
+  breakdown: { label: string; pct: number }[];
+  insights: { label: string; value: string; dir: 'up' | 'down' | 'flat' }[];
+};
+
+const domainMeta: Record<string, DomainMeta> = {
+  org: {
+    dataSources: ['Tenant Management/Organizations', 'Users/Vendors'],
+    links: [{ label: 'Vendors', relation: 'ownership' }, { label: 'Tenants', relation: 'parent' }],
+    breakdown: [{ label: 'Vacation Rental Co', pct: 42 }, { label: 'Property Manager', pct: 28 }, { label: 'Agency', pct: 18 }, { label: 'Enterprise', pct: 12 }],
+    insights: [{ label: 'New org registrations up', value: '+24 this month', dir: 'up' }, { label: 'Churn risk: 3 orgs', value: 'Pending renewal', dir: 'down' }],
+  },
+  listing: {
+    dataSources: ['Users/Vendors (creator)', 'Geography/Location', 'Trust/Media Moderation'],
+    links: [{ label: 'Taxonomy', relation: 'categories/tags/amenities' }, { label: 'Inventory', relation: 'stock' }, { label: 'Reviews', relation: 'ratings' }],
+    breakdown: [{ label: 'Vacation Rental', pct: 42 }, { label: 'Event Space', pct: 24 }, { label: 'Experience', pct: 18 }, { label: 'Service', pct: 10 }, { label: 'Ticket', pct: 6 }],
+    insights: [{ label: 'Pending approvals', value: '47 listings', dir: 'down' }, { label: 'Avg approval time', value: '2.4h', dir: 'up' }],
+  },
+  order: {
+    dataSources: ['Commerce/Orders', 'Listings (items)', 'Users (buyer/seller)'],
+    links: [{ label: 'Transactions', relation: 'child' }, { label: 'Refunds', relation: 'child' }, { label: 'Chargebacks', relation: 'child' }],
+    breakdown: [{ label: 'Completed', pct: 72 }, { label: 'Processing', pct: 14 }, { label: 'Pending', pct: 10 }, { label: 'Refunded', pct: 4 }],
+    insights: [{ label: 'Peak day: Saturday', value: '+28% vs avg', dir: 'up' }, { label: 'Refund rate trending', value: '-0.4%', dir: 'up' }],
+  },
+  user: {
+    dataSources: ['Users/Sessions', 'Users/All Users', 'Tenant Management/Organizations'],
+    links: [{ label: 'Roles', relation: 'access control' }, { label: 'Sessions', relation: 'active logins' }, { label: 'Identity Verification', relation: 'KYC' }],
+    breakdown: [{ label: 'Customers', pct: 78 }, { label: 'Vendors', pct: 14 }, { label: 'Support', pct: 6 }, { label: 'Admins', pct: 2 }],
+    insights: [{ label: 'New signups (7d)', value: '+1,240', dir: 'up' }, { label: 'Suspended accounts', value: '142 (+12)', dir: 'down' }],
+  },
+  ticket: {
+    dataSources: ['Support/Tickets', 'Users', 'Orders', 'Reservations'],
+    links: [{ label: 'Knowledge Base', relation: 'FAQs' }, { label: 'Canned Responses', relation: 'templates' }, { label: 'Escalations', relation: 'priority' }],
+    breakdown: [{ label: 'Email', pct: 38 }, { label: 'Chat', pct: 28 }, { label: 'Phone', pct: 22 }, { label: 'Web', pct: 12 }],
+    insights: [{ label: 'Avg resolution improving', value: '4.2h (-18m)', dir: 'up' }, { label: 'Escalations need attention', value: '23 open', dir: 'down' }],
+  },
+  trust: {
+    dataSources: ['Trust/Violations', 'Trust/Fraud Review', 'System/Monitoring'],
+    links: [{ label: 'Reported Listings', relation: 'flagged' }, { label: 'Appeals', relation: 'appellant' }, { label: 'Risk Rules', relation: 'scoring' }],
+    breakdown: [{ label: 'Prohibited content', pct: 32 }, { label: 'Fake listing', pct: 24 }, { label: 'Pricing manipulation', pct: 18 }, { label: 'Spam', pct: 14 }, { label: 'Copyright', pct: 12 }],
+    insights: [{ label: 'Critical cases', value: '12 urgent', dir: 'down' }, { label: 'Resolution rate', value: '+24% (7d)', dir: 'up' }],
+  },
+  client: {
+    dataSources: ['Reservation Services/Clients', 'Commerce/Billing'],
+    links: [{ label: 'Contracts', relation: 'booking rules' }, { label: 'Service Plans', relation: 'subscription' }, { label: 'Client Profiles', relation: 'company info' }],
+    breakdown: [{ label: 'Vacation Rental Co', pct: 48 }, { label: 'Property Manager', pct: 32 }, { label: 'Individual Owner', pct: 20 }],
+    insights: [{ label: 'New clients (30d)', value: '+8', dir: 'up' }, { label: 'Contract renewals', value: '12 pending', dir: 'down' }],
+  },
+  agent: {
+    dataSources: ['Agent Management/Performance', 'Live Calls', 'Reservations'],
+    links: [{ label: 'Teams', relation: 'queue assignment' }, { label: 'Skills', relation: 'AI routing' }, { label: 'Shift Scheduling', relation: 'availability' }],
+    breakdown: [{ label: 'Reservations A', pct: 28 }, { label: 'Reservations B', pct: 24 }, { label: 'Property Support', pct: 20 }, { label: 'VIP Concierge', pct: 16 }, { label: 'Escalations', pct: 12 }],
+    insights: [{ label: 'CSAT improving', value: '91.8% (+2.3%)', dir: 'up' }, { label: 'Utilization high', value: 'Avg 78%', dir: 'up' }],
+  },
+  commerce: {
+    dataSources: ['Commerce/Transactions', 'Commerce/Payments', 'Payment Providers'],
+    links: [{ label: 'Orders', relation: 'parent' }, { label: 'Wallet', relation: 'funding' }, { label: 'Gift Cards', relation: 'payment' }],
+    breakdown: [{ label: 'Stripe', pct: 52 }, { label: 'PayPal', pct: 28 }, { label: 'Bank Transfer', pct: 14 }, { label: 'Wallet', pct: 6 }],
+    insights: [{ label: 'Volume (24h)', value: '$284.5K (+12%)', dir: 'up' }, { label: 'Failed transactions', value: '47 (0.4%)', dir: 'up' }],
+  },
+  marketing: {
+    dataSources: ['Analytics/Marketing', 'Commerce/Orders (revenue)'],
+    links: [{ label: 'Campaigns', relation: 'performance' }, { label: 'Promotions', relation: 'discounts' }, { label: 'Landing Pages', relation: 'traffic' }],
+    breakdown: [{ label: 'Sponsored', pct: 34 }, { label: 'Featured', pct: 26 }, { label: 'Display', pct: 20 }, { label: 'Social', pct: 12 }, { label: 'Email', pct: 8 }],
+    insights: [{ label: 'CTR above benchmark', value: '3.2% (+0.4%)', dir: 'up' }, { label: 'Spend tracking', value: '$48.2K (30d)', dir: 'down' }],
+  },
+  api: {
+    dataSources: ['API Management/Usage', 'API Analytics'],
+    links: [{ label: 'Consumers', relation: 'API keys' }, { label: 'Rate Limits', relation: 'throttling' }, { label: 'Webhooks', relation: 'delivery' }],
+    breakdown: [{ label: 'Web App', pct: 48 }, { label: 'Mobile iOS', pct: 32 }, { label: 'Mobile Android', pct: 16 }, { label: 'Partners', pct: 4 }],
+    insights: [{ label: 'Latency improved', value: '94ms (-8ms)', dir: 'up' }, { label: 'Error rate low', value: '0.4% (-0.1%)', dir: 'up' }],
+  },
+  webhook: {
+    dataSources: ['API Management/Webhooks'],
+    links: [{ label: 'API Keys', relation: 'auth' }, { label: 'Consumers', relation: 'owner' }, { label: 'API Logs', relation: 'delivery log' }],
+    breakdown: [{ label: 'booking.created', pct: 32 }, { label: 'payment.completed', pct: 28 }, { label: 'listing.approved', pct: 22 }, { label: 'user.registered', pct: 18 }],
+    insights: [{ label: 'Delivery rate', value: '98.2% (+0.3%)', dir: 'up' }, { label: 'Failed deliveries', value: '127 (-22%)', dir: 'up' }],
+  },
+  system_log: {
+    dataSources: ['System/Monitoring', 'System/Logs'],
+    links: [{ label: 'Metrics', relation: 'performance' }, { label: 'Health Checks', relation: 'status' }, { label: 'Alerts', relation: 'thresholds' }],
+    breakdown: [{ label: 'info', pct: 68 }, { label: 'warning', pct: 22 }, { label: 'error', pct: 8 }, { label: 'debug', pct: 2 }],
+    insights: [{ label: 'Error spike', value: '+124 (24h)', dir: 'down' }, { label: 'All services online', value: '12/12', dir: 'up' }],
+  },
+  backup: {
+    dataSources: ['System/Backups'],
+    links: [{ label: 'Disaster Recovery', relation: 'restore' }, { label: 'Scheduler', relation: 'schedule' }],
+    breakdown: [{ label: 'Database', pct: 42 }, { label: 'Media', pct: 32 }, { label: 'Configs', pct: 18 }, { label: 'Logs', pct: 8 }],
+    insights: [{ label: 'Success rate', value: '99.2%', dir: 'up' }, { label: 'Storage growing', value: '+12 GB', dir: 'down' }],
+  },
+  scheduler: {
+    dataSources: ['System/Scheduler'],
+    links: [{ label: 'Backups', relation: 'trigger' }, { label: 'Maintenance', relation: 'window' }],
+    breakdown: [{ label: 'Every 5 min', pct: 28 }, { label: 'Hourly', pct: 24 }, { label: 'Daily', pct: 22 }, { label: 'Weekly', pct: 16 }, { label: 'Monthly', pct: 10 }],
+    insights: [{ label: 'Failed jobs (24h)', value: '2 (-5)', dir: 'up' }, { label: 'Avg duration', value: '4m 12s', dir: 'up' }],
+  },
+  governance: {
+    dataSources: ['Platform Governance/Vendor Rules', 'Compliance Reports'],
+    links: [{ label: 'Approval Workflows', relation: 'listings/users' }, { label: 'Policy Engine', relation: 'evaluation' }, { label: 'Data Governance', relation: 'retention' }],
+    breakdown: [{ label: 'Approved', pct: 64 }, { label: 'Pending', pct: 22 }, { label: 'Rejected', pct: 14 }],
+    insights: [{ label: 'Pending approvals', value: '24 action needed', dir: 'down' }, { label: 'Avg approval time', value: '2.4h (-22m)', dir: 'up' }],
+  },
+  geo: {
+    dataSources: ['Geography/Countries', 'Geography/Cities', 'Geography/Service Areas'],
+    links: [{ label: 'Listings', relation: 'location' }, { label: 'Users', relation: 'address' }, { label: 'Service Areas', relation: 'coverage' }],
+    breakdown: [{ label: 'Europe', pct: 38 }, { label: 'North America', pct: 32 }, { label: 'Asia', pct: 18 }, { label: 'Other', pct: 12 }],
+    insights: [{ label: 'New cities added', value: '+124', dir: 'up' }, { label: 'Service areas', value: '892 active', dir: 'up' }],
+  },
+  content: {
+    dataSources: ['Content Management/Pages', 'Content/Media Library'],
+    links: [{ label: 'Navigation', relation: 'top nav' }, { label: 'Footer', relation: 'layout' }, { label: 'Media Library', relation: 'assets' }],
+    breakdown: [{ label: 'Published', pct: 74 }, { label: 'Draft', pct: 17 }, { label: 'Scheduled', pct: 9 }],
+    insights: [{ label: 'New pages (30d)', value: '+12', dir: 'up' }, { label: 'Drafts in progress', value: '42', dir: 'up' }],
+  },
+  search: {
+    dataSources: ['Global Search (queries)', 'Search Analytics'],
+    links: [{ label: 'Zero Result Searches', relation: 'synonyms' }, { label: 'Search Funnel', relation: 'conversion' }, { label: 'Search Logs', relation: 'raw' }],
+    breakdown: [{ label: 'Hotels', pct: 28 }, { label: 'Vacation Rentals', pct: 24 }, { label: 'Events', pct: 20 }, { label: 'Experiences', pct: 16 }, { label: 'Services', pct: 12 }],
+    insights: [{ label: 'Zero results improving', value: '4.2% (-0.8%)', dir: 'up' }, { label: 'Search revenue', value: '$18.2K (+8%)', dir: 'up' }],
+  },
+  audit: {
+    dataSources: ['All modules (write actions)', 'User Management/Audit Logs'],
+    links: [{ label: 'User Sessions', relation: 'login history' }, { label: 'Security Policies', relation: 'compliance' }],
+    breakdown: [{ label: 'success', pct: 82 }, { label: 'warning', pct: 14 }, { label: 'error', pct: 4 }],
+    insights: [{ label: 'Events (24h)', value: '14,829 (+8%)', dir: 'up' }, { label: 'Failed access', value: '47 (-12)', dir: 'up' }],
+  },
+  property: {
+    dataSources: ['Reservation Operations', 'Property Support'],
+    links: [{ label: 'Emergency Dispatch', relation: 'escalation' }, { label: 'Escalation Chain', relation: 'contacts' }],
+    breakdown: [{ label: 'Lockout', pct: 24 }, { label: 'Maintenance', pct: 32 }, { label: 'Housekeeping', pct: 18 }, { label: 'Complaint', pct: 14 }, { label: 'Damage', pct: 12 }],
+    insights: [{ label: 'Avg response time', value: '18m (-4m)', dir: 'up' }, { label: 'Open tickets', value: '84 (+12)', dir: 'down' }],
+  },
+  qa: {
+    dataSources: ['Quality Assurance/Call Reviews', 'Call Recording'],
+    links: [{ label: 'Scorecards', relation: 'criteria' }, { label: 'Coaching', relation: 'agents' }, { label: 'AI QA', relation: 'auto scoring' }],
+    breakdown: [{ label: 'Excellent (90+)', pct: 42 }, { label: 'Good (80-89)', pct: 34 }, { label: 'Needs improvement', pct: 18 }, { label: 'Flagged', pct: 6 }],
+    insights: [{ label: 'Avg score', value: '87.2% (+1.4%)', dir: 'up' }, { label: 'Flagged reviews', value: '12 coaching', dir: 'down' }],
+  },
+  automation: {
+    dataSources: ['Automation/Routing Rules', 'Automation/SLA Rules'],
+    links: [{ label: 'IVR Builder', relation: 'menus' }, { label: 'Auto Assignment', relation: 'queues' }, { label: 'AI Routing', relation: 'scoring' }],
+    breakdown: [{ label: 'Routing', pct: 32 }, { label: 'Escalation', pct: 24 }, { label: 'SLA', pct: 22 }, { label: 'Follow-up', pct: 14 }, { label: 'Reminder', pct: 8 }],
+    insights: [{ label: 'Executions (7d)', value: '8,429 (+18%)', dir: 'up' }, { label: 'Success rate', value: '98.4%', dir: 'up' }],
+  },
+  sdk: {
+    dataSources: ['API Management/SDKs'],
+    links: [{ label: 'API Keys', relation: 'auth' }, { label: 'OAuth Apps', relation: 'integration' }],
+    breakdown: [{ label: 'JavaScript', pct: 38 }, { label: 'Python', pct: 28 }, { label: 'Ruby', pct: 16 }, { label: 'Go', pct: 12 }, { label: 'PHP', pct: 6 }],
+    insights: [{ label: 'Downloads growing', value: '248K (+18%)', dir: 'up' }, { label: 'Latest release', value: 'v2.4.1', dir: 'up' }],
+  },
+  tenant: {
+    dataSources: ['Tenant Management', 'Tenant Management/Usage', 'Content/Media Library'],
+    links: [{ label: 'Organizations', relation: 'child' }, { label: 'Subscription Plans', relation: 'feature flags' }, { label: 'Feature Flags', relation: 'UI visibility' }, { label: 'Quotas', relation: 'limits' }],
+    breakdown: [{ label: 'Enterprise', pct: 38 }, { label: 'Scale', pct: 32 }, { label: 'Growth', pct: 22 }, { label: 'Starter', pct: 8 }],
+    insights: [{ label: 'MRR per tenant', value: '$24.5K avg', dir: 'up' }, { label: 'Trial conversions', value: '+12%', dir: 'up' }],
+  },
+  analytics: {
+    dataSources: ['Revenue Operations', 'Commerce', 'Reservation Operations'],
+    links: [{ label: 'Financial Reports', relation: 'revenue' }, { label: 'Cohorts', relation: 'retention' }, { label: 'Funnel Analytics', relation: 'conversion' }, { label: 'Export Center', relation: 'downloads' }],
+    breakdown: [{ label: 'Revenue', pct: 34 }, { label: 'Bookings', pct: 28 }, { label: 'Users', pct: 22 }, { label: 'Growth', pct: 16 }],
+    insights: [{ label: 'Revenue trending up', value: '+14.2% MoM', dir: 'up' }, { label: 'Funnel conversion', value: '3.2% (+0.4%)', dir: 'up' }],
+  },
+  revenue: {
+    dataSources: ['Commerce/Orders', 'Commerce/Transactions', 'Commerce/Payouts'],
+    links: [{ label: 'MRR/ARR', relation: 'recurring' }, { label: 'GMV', relation: 'gross' }, { label: 'Take Rate', relation: 'commissions' }, { label: 'Vendor Revenue', relation: 'payouts' }],
+    breakdown: [{ label: 'Commission', pct: 52 }, { label: 'Subscription', pct: 28 }, { label: 'Featured', pct: 12 }, { label: 'Sponsored', pct: 8 }],
+    insights: [{ label: 'MRR', value: '$2.4M (+8.2%)', dir: 'up' }, { label: 'Take rate', value: '12.4% (+0.3%)', dir: 'up' }],
+  },
+  res_report: {
+    dataSources: ['Reservation Operations', 'Call Center', 'Messaging'],
+    links: [{ label: 'Agent Performance', relation: 'productivity' }, { label: 'SLA Performance', relation: 'compliance' }, { label: 'Occupancy', relation: 'calendar' }],
+    breakdown: [{ label: 'Reservations', pct: 32 }, { label: 'Calls', pct: 26 }, { label: 'Response Time', pct: 20 }, { label: 'Conversion', pct: 14 }, { label: 'Revenue', pct: 8 }],
+    insights: [{ label: 'Bookings up', value: '+8.1% today', dir: 'up' }, { label: 'Avg call handle', value: '6m 24s', dir: 'flat' }],
+  },
+  callcenter: {
+    dataSources: ['Call Center/Live Calls', 'Call Center/Call Queue', 'Agent Dashboard'],
+    links: [{ label: 'IVR Menus', relation: 'routing' }, { label: 'Ring Groups', relation: 'extensions' }, { label: 'Call Recording', relation: 'QA' }],
+    breakdown: [{ label: 'Reservations', pct: 38 }, { label: 'Property Support', pct: 28 }, { label: 'VIP', pct: 18 }, { label: 'Billing', pct: 10 }, { label: 'Escalations', pct: 6 }],
+    insights: [{ label: 'Calls in queue', value: '5 waiting', dir: 'down' }, { label: 'Avg wait', value: '2m 18s', dir: 'up' }],
+  },
+  messaging: {
+    dataSources: ['Messaging/Unified Inbox', 'Messaging/Message History'],
+    links: [{ label: 'Auto Responses', relation: 'SLA triggers' }, { label: 'Message Templates', relation: 'automation' }, { label: 'Reservation Operations', relation: 'context' }],
+    breakdown: [{ label: 'SMS', pct: 34 }, { label: 'Email', pct: 28 }, { label: 'Live Chat', pct: 22 }, { label: 'WhatsApp', pct: 10 }, { label: 'Messenger', pct: 6 }],
+    insights: [{ label: 'Avg response time', value: '42s (-8s)', dir: 'up' }, { label: 'Unified inbox volume', value: '1,847 (24h)', dir: 'up' }],
+  },
+  kb: {
+    dataSources: ['Knowledge Base', 'AI Answers'],
+    links: [{ label: 'Client Scripts', relation: 'call guidance' }, { label: 'Reservation Scripts', relation: 'booking calls' }, { label: 'FAQs', relation: 'support' }],
+    breakdown: [{ label: 'Scripts', pct: 38 }, { label: 'Procedures', pct: 28 }, { label: 'FAQs', pct: 22 }, { label: 'Objections', pct: 12 }],
+    insights: [{ label: 'AI answer rate', value: '68% self-served', dir: 'up' }, { label: 'Script updates', value: '4 pending review', dir: 'down' }],
+  },
+  ivr: {
+    dataSources: ['Automation/IVR Builder', 'Call Center/IVR Menus'],
+    links: [{ label: 'Call Routing', relation: 'evaluation' }, { label: 'Ring Groups', relation: 'extensions' }],
+    breakdown: [{ label: 'Greeting', pct: 10 }, { label: 'Menu', pct: 30 }, { label: 'Route', pct: 35 }, { label: 'Voicemail', pct: 15 }, { label: 'Hangup', pct: 10 }],
+    insights: [{ label: 'Active IVR trees', value: '4 deployed', dir: 'up' }, { label: 'Avg menu depth', value: '3 levels', dir: 'flat' }],
+  },
+};
+
+export function getDomainMeta(domain: string): DomainMeta {
+  return domainMeta[domain] ?? {
+    dataSources: ['All modules'],
+    links: [{ label: 'Settings', relation: 'configuration' }],
+    breakdown: [{ label: 'Active', pct: 72 }, { label: 'Pending', pct: 18 }, { label: 'Archived', pct: 10 }],
+    insights: [{ label: 'Data current', value: 'Synced 2h ago', dir: 'up' }],
+  };
+}
+
 /* Settings page field generator */
 export function generateSettingsFields(domain: string) {
   const fieldsMap: Record<string, { label: string; type: 'text' | 'toggle' | 'select' | 'number' | 'textarea'; value: any; options?: string[]; description?: string }[]> = {
