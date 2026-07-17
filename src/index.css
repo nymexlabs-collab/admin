@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-outline-variant;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-on-surface font-sans antialiased;
+  }
+
+  /* Custom scrollbar — thin, neutral */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-outline-variant rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-outline;
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/30 ring-offset-2 ring-offset-surface;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface-container-lowest border border-outline-variant rounded-xl shadow-card;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-card-hover hover:border-outline;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg text-label-md text-label-md transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-on-primary px-4 py-2 hover:brightness-110 shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface-container-high text-on-surface px-4 py-2 border border-outline-variant hover:bg-surface-container-highest;
+  }
+
+  .btn-ghost {
+    @apply btn text-on-surface-variant px-3 py-2 hover:bg-surface-container-high hover:text-on-surface;
+  }
+
+  .btn-icon {
+    @apply btn p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-full;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface placeholder:text-outline transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-label-sm text-label-sm font-semibold;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low transition-all duration-150 active:scale-[0.98];
+  }
+
+  .nav-link-active {
+    @apply text-primary bg-secondary-container/40 font-semibold;
+  }
+
+  .table-cell {
+    @apply px-5 py-3.5 text-body-sm text-on-surface;
+  }
+
+  .table-header {
+    @apply px-5 py-3 text-left text-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider;
+  }
+}
