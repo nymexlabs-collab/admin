@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import {
   Search, Bell, Plus, Command, ChevronDown, ChevronRight, Menu, X,
-  Settings, ShieldCheck, AlertTriangle,
+  Settings, ShieldCheck, AlertTriangle, Star,
+  Users, Building2, ShoppingCart, CalendarCheck, FileText, CreditCard,
+  Store, LifeBuoy, LayoutDashboard, ShieldAlert, Phone,
 } from 'lucide-react';
 import { navigation, allRoutes, type NavSection, type NavSubGroup, type NavItem } from '../navigation';
 
@@ -188,6 +190,31 @@ export function Sidebar({
           ))}
         </nav>
 
+        {/* Favorites — quick access menu in sidebar, state stored in User Preferences */}
+        <div className="px-3 pb-2 border-t border-outline-variant/60 shrink-0">
+          <div className="flex items-center gap-2 px-3 py-2 text-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+            <Star className="w-3 h-3" /> Favorites
+          </div>
+          <div className="space-y-0.5">
+            {[
+              { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+              { label: 'Fraud Review', path: '/marketplace/trust/fraud', icon: ShieldAlert },
+              { label: 'Call Center', path: '/reservations/callcenter', icon: Phone },
+              { label: 'Support Tickets', path: '/support/tickets', icon: LifeBuoy },
+              { label: 'Audit Logs', path: '/settings/audit-logs', icon: FileText },
+            ].map((f) => (
+              <button
+                key={f.path}
+                onClick={() => { onNavigate(f.path); onClose(); }}
+                className="nav-link"
+              >
+                <f.icon className="w-3.5 h-3.5 opacity-50" />
+                <span className="truncate text-body-sm text-body-sm">{f.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="px-3 py-3 border-t border-outline-variant shrink-0">
           <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer">
@@ -221,15 +248,30 @@ export function TopNav({
   const [searchResults, setSearchResults] = useState<{ path: string; label: string }[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [lookupType, setLookupType] = useState('all');
+
+  const lookupTypes = [
+    { value: 'all', label: 'All', icon: Search },
+    { value: 'users', label: 'Users', icon: Users, filter: '/users' },
+    { value: 'listings', label: 'Listings', icon: Store, filter: '/marketplace/listings' },
+    { value: 'orders', label: 'Orders', icon: ShoppingCart, filter: '/commerce/orders' },
+    { value: 'reservations', label: 'Reservations', icon: CalendarCheck, filter: '/marketplace/reservations' },
+    { value: 'organizations', label: 'Orgs', icon: Building2, filter: '/marketplace/organizations' },
+    { value: 'tickets', label: 'Tickets', icon: LifeBuoy, filter: '/support/tickets' },
+    { value: 'transactions', label: 'Transactions', icon: CreditCard, filter: '/commerce/transactions' },
+  ];
 
   useEffect(() => {
     if (search.trim()) {
       const q = search.toLowerCase();
-      setSearchResults(allRoutes.filter((r) => r.label.toLowerCase().includes(q)).slice(0, 8));
+      let results = allRoutes.filter((r) => r.label.toLowerCase().includes(q));
+      const activeFilter = lookupTypes.find((t) => t.value === lookupType)?.filter;
+      if (activeFilter) results = results.filter((r) => r.path.startsWith(activeFilter));
+      setSearchResults(results.slice(0, 8));
     } else {
       setSearchResults([]);
     }
-  }, [search]);
+  }, [search, lookupType]);
 
   return (
     <header className="sticky top-0 z-30 h-[64px] bg-surface/80 backdrop-blur-md border-b border-outline-variant flex items-center gap-3 px-4 lg:px-6">
@@ -238,19 +280,27 @@ export function TopNav({
       </button>
 
       <div className="relative flex-1 max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
+        <div className="relative flex items-center gap-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none z-10" />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setShowResults(true); }}
             onFocus={() => setShowResults(true)}
             onBlur={() => setTimeout(() => setShowResults(false), 150)}
-            placeholder="Search pages, records, people…"
-            className="input pl-9 pr-16 h-9"
+            placeholder={`Search ${lookupTypes.find((t) => t.value === lookupType)?.label.toLowerCase() ?? 'everything'}…`}
+            className="input pl-9 pr-20 h-9"
           />
+          {/* Universal Lookup — appears inside Global Search as a type filter */}
+          <select
+            value={lookupType}
+            onChange={(e) => setLookupType(e.target.value)}
+            className="absolute right-9 top-1/2 -translate-y-1/2 bg-surface-container-high text-label-sm text-on-surface-variant border-none outline-none rounded px-1 py-0.5 cursor-pointer max-w-[80px]"
+          >
+            {lookupTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
           <button
             onClick={onOpenPalette}
-            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-label-sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-label-sm"
           >
             <Command className="w-3 h-3" />K
           </button>
